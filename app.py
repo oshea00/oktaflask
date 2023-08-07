@@ -20,10 +20,16 @@ from user import User
 load_dotenv('.okta.env')
 
 app = Flask(__name__)
+
 app.config.update({'SECRET_KEY': secrets.token_hex(64)})
+
+for key in app.config.keys():
+    print(f"{key} : {app.config[key]}")
+
 CORS(app)
 
-login_manager = LoginManager()
+# https://flask-login.readthedocs.io/en/latest/#flask_login.LoginManager.login_view
+login_manager = LoginManager() 
 login_manager.init_app(app)
 
 
@@ -41,16 +47,22 @@ def home():
 def login():
     # store app state and code verifier in session
     session['app_state'] = secrets.token_urlsafe(64)
+    print(f"session['app_state'] : {session['app_state']}")
     session['code_verifier'] = secrets.token_urlsafe(64)
+    print(f"session['code_verifier'] =: {session['code_verifier']}")
 
     # calculate code challenge
     hashed = hashlib.sha256(session['code_verifier'].encode('ascii')).digest()
     encoded = base64.urlsafe_b64encode(hashed)
     code_challenge = encoded.decode('ascii').strip('=')
+    print(f"b64encode(sha256(code_verifier).digest()).decode : {code_challenge}")
+
+    hosturl = url_for('home',_external=True)
+    print(f"baseurl: {hosturl}") # from flask run - may not be app's real url
 
     # get request params
     query_params = {'client_id': os.environ['CLIENT_ID'],
-                    'redirect_uri': "http://localhost:5000/authorization-code/callback",
+                    'redirect_uri': F"{hosturl}authorization-code/callback",
                     'scope': "openid email profile",
                     'state': session['app_state'],
                     'code_challenge': code_challenge,
@@ -99,6 +111,7 @@ def callback():
     if not exchange.get("token_type"):
         return "Unsupported token type. Should be 'Bearer'.", 403
     access_token = exchange["access_token"]
+    print(F"access_token : {access_token}")
     id_token = exchange["id_token"]
 
     # Authorization flow successful, get userinfo and login user
